@@ -2,7 +2,7 @@ WHAT IS DGIT?
 =============
 
 `dgit` (pronounced "dig it", as in "Is this software awesome or what?" "Yeah, I
-dig it") is a wrapper for git that adds the ability to configure default
+dig it") is a wrapper for `git` that adds the ability to configure default
 arguments for `git`'s built-in commands.
 
 THAT SOUNDS AWESOME! HOW DO I GET DGIT?
@@ -14,28 +14,28 @@ github (https://github.com/todesschaf/dgit).
 WHAT DO I DO THEN?
 ==================
 
-install dgit.py from this source directory somewhere in your `$PATH`, then do
+install dgit.py from this source directory somewhere in your `$PATH`, then do:
 
-   alias git=dgit
+    alias git=dgit
 
-for you people who use a sane shell, or
+for you people who use a sane shell, or:
 
-   alias git dgit
+    alias git dgit
 
 for you wackjobs who use \*csh.
 
-If you don't feel like "overwriting" your real git with dgit by using an alias,
-dgit will work just fine withouth being aliased. The rest of this README assumes
-you're using the alias, though.
+If you don't feel like "overwriting" your real `git` with `dgit` by using an
+alias, `dgit` will work just fine withouth being aliased. The rest of this
+README assumes you're using the alias, though.
 
 After that, just use `git` the way you normally would. If you have `git-hg`
 installed, as well, you can do things like:
 
-   git clone hg+http://hg.example.com/examplerepo
+    git clone hg+http://hg.example.com/examplerepo
 
-and
+and:
 
-   git fetch # (in a git-hg repo)
+    git fetch # (in a git-hg repo)
 
 and `dgit` will Do The Right Thing.
 
@@ -49,7 +49,7 @@ Why, through `gitconfig`, of course! There are two sections that are relevant to
 `dgit` (though neither are required). The first is the `[dgit]` section. This is
 where you can explicitly tell `dgit` two things: if (and where, if necessary)
 you have `git-hg` installed, and if (and where, if necessary) you have `hub`
-installed.
+installed:
 
     [dgit]
     githg = /path/where/githg/lives
@@ -59,7 +59,7 @@ If `git-hg` and/or `hub` are already in your `$PATH`, you can omit those lines
 from the config entirely, as `dgit` will notice and just Do The Right Thing.
 
 If you have `hub` in your `$PATH` and DON'T want `dgit` to use it, you can just
-say
+say:
 
     [dgit]
     hub = off
@@ -71,7 +71,7 @@ The second config section is where you set default arguments for normal `git`
 commands, a section appropriately called `[defaults]`. Under this section, you
 can have an entry for any `git` command where you list the default arguments you
 want passed to it all the time. For example, if you always wanted `--stat` as
-an argument to `git log`, you would have a `[defaults]` section that looks like
+an argument to `git log`, you would have a `[defaults]` section that looks like:
 
     [defaults]
     log = --stat
