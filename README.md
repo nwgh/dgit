@@ -14,7 +14,8 @@ github (https://github.com/todesschaf/dgit).
 WHAT DO I DO THEN?
 ==================
 
-install dgit.py from this source directory somewhere in your `$PATH`, then do:
+Install `dgit.py` from this source directory somewhere in your `$PATH` as
+`dgit`, then do:
 
     alias git=dgit
 
@@ -29,7 +30,8 @@ alias, `dgit` will work just fine withouth being aliased. The rest of this
 README assumes you're using the alias, though.
 
 After that, just use `git` the way you normally would. If you have `git-hg`
-installed, as well, you can do things like:
+(https://github.com/todesschaf/git-hg) installed, as well, you can do things
+like:
 
     git clone hg+http://hg.example.com/examplerepo
 
@@ -64,8 +66,8 @@ say:
     [dgit]
     hub = off
 
-in your gitconfig, and `dgit` will jump straight to using `git` instead of also
-wrapping it in `hub`.
+in your `gitconfig`, and `dgit` will jump straight to using `git` instead of
+also wrapping it in `hub`.
 
 The second config section is where you set default arguments for normal `git`
 commands, a section appropriately called `[defaults]`. Under this section, you
