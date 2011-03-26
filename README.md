@@ -9,7 +9,7 @@ THAT SOUNDS AWESOME! HOW DO I GET DGIT?
 =======================================
 
 You've come to the right place, young grasshopper. You can download it from
-github (https://github.com/todesschaf/dgit).
+github (<https://github.com/todesschaf/dgit>).
 
 WHAT DO I DO THEN?
 ==================
@@ -30,7 +30,7 @@ alias, `dgit` will work just fine withouth being aliased. The rest of this
 README assumes you're using the alias, though.
 
 After that, just use `git` the way you normally would. If you have `git-hg`
-(https://github.com/todesschaf/git-hg) installed, as well, you can do things
+(<https://github.com/todesschaf/git-hg>) installed, as well, you can do things
 like:
 
     git clone hg+http://hg.example.com/examplerepo
@@ -41,8 +41,8 @@ and:
 
 and `dgit` will Do The Right Thing.
 
-If you use `hub` (https://github.com/defunkt/hub) `dgit` can also be configured
-to use that.
+If you use `hub` (<https://github.com/defunkt/hub>) `dgit` can also be
+configured to use that.
 
 HOW DO I CONFIGURE DGIT?
 ========================
