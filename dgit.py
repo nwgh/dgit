@@ -5,12 +5,24 @@ import stat
 import subprocess
 import sys
 
+import pgl
+
 DGIT_CONF = 'dgit.'
 DGIT_CONF_LEN = len(DGIT_CONF)
 ALIAS_CONF = 'alias.'
 ALIAS_CONF_LEN = len(ALIAS_CONF)
 DEFAULT_CONF = 'defaults.'
 DEFAULT_CONF_LEN = len(DEFAULT_CONF)
+
+cmd_options = []
+config = {'git-hg':False, 'hub':False, 'cmds':None}
+
+try:
+    import ghg
+except ImportError:
+    # If we can't import ghg, it doesn't matter if git-hg is otherwise installed,
+    # we can't do any git-hg work
+    config['git-hg'] = None
 
 def is_exe(fname):
     """Determine if a file exists, and, if so, if it's executable by our user
@@ -47,14 +59,18 @@ def is_exe(fname):
 
     return False
 
-def locate_externals(config):
+def locate_externals():
     """Find the location of git-hg and hub, if we haven't been explicitly told
     where they are
     """
-    ghg_found = bool(config['git-hg'])
-    # Hub is a special case - 'None' means we don't WANT to find it, so if
-    # that's its value, we'll treat it as already found
+    # None means we don't WANT to find the external program in question, so
+    # we'll pretend we already found it so we don't ACTUALLY find it
+    ghg_found = True if config['git-hg'] if None else bool(config['git-hg'])
     hub_found = True if config['hub'] is None else bool(config['hub'])
+
+    if 'hg' in config['cmds'] and not ghg_found:
+        config['git-hg'] = True
+        ghg_found = True
 
     if ghg_found and hub_found:
         # Hey, look! We're done without even really starting!
@@ -76,42 +92,104 @@ def locate_externals(config):
             return
 
 def load_git_commands():
-    # TODO
-    pass
+    """Make a list of git's built-in commands
+    """
+    for f in os.listdir(pgl.config['GIT_LIBEXEC']):
+        if '--' in f:
+            # Skip these, since they're just additions to other git commands
+            continue
+        full = os.path.join(pgl.config['GIT_LIBEXEC'], f)
+        if f.startswith('git-') and os.path.isfile(full) and \
+            (os.stat(full).st_mode & (stat.S_IXUSR|stat.S_IXGRP|stat.S_IXOTH)):
+            cmd_options.append(f[4:])
 
-def handle_git_hg():
-    # TODO
-    pass
+def get_git_command(args):
+    """Figure out which git command we've been told to run
+    """
+    for i, a in enumerate(args):
+        if a in config['cmds']:
+            return a, i
+    return None, None
 
-if __name__ == '__main__':
-    cmd_options = []
-    config = {'git-hg':False, 'hub':False, 'cmds':None}
+def handle_git_hg(cmd, pos, args):
+    """Return a modified argument list if we're doing an operation on a git-hg
+    repo. For example, cloning an hg repo using the special URL syntax
+      git clone hg+http://hg.example.com/repo
+    Which passes us the args list
+      ['clone', 'hg+http://hg.example.com/repo']
+    Would return the new list
+      ['hg', 'clone', 'http://hg.example.com/repo']
 
-    git_config = subprocess.Popen(['git', 'config', '-l'],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    Similarly, running a fetch in an hg repo (that does not fetch from a non-hg
+    remote) like
+      git fetch
+    Which passes us the args list
+      ['fetch']
+    Would return the new list
+      ['hg', 'fetch']
+    """
+    offset = 0
+    if cmd in ('clone', 'fetch', 'pull', 'push'):
+        if cmd == 'clone':
+            urlpos = None
+            for i, a in enumerate(args):
+                if a.startswith('hg+'):
+                    urlpos = i
+            if urlpos is not None:
+                # This means we've found an hg-special URL, so we need to
+                # massage this command into a git-hg command
+                args[urlpos] = args[urlpos][3:]
+                args.insert(pos, 'hg')
+                offset = 1
+        else:
+            try:
+                ghg.include_hg_setup()
+                ghg.ensure_is_ghg()
+                if cmd in ('fetch', 'pull') and len(args) != 1:
+                    # Someone's fetching or pulling from NOT hg
+                    raise Exception, 'This just breaks us out before we do bad'
+                if cmd == 'push' and len(args) > 3:
+                    # Someone's doing some other crazy git push
+                    raise Exception, 'This just breaks us out before we do bad'
+
+                # If we get here, we're reasonably confident we're operating on
+                # the actual HG remote instead of some random other git remote,
+                # so make go on that!
+                args.insert(pos, 'hg')
+                offset = 1
+            except:
+                # This isn't a Git-HG repo, we're communicating with a non-hg
+                # remote, or there was some error figuring out the git-hg setup
+                # for the current dir, so we just continue on with our original
+                # command and args, trusting the REAL git to give us a proper
+                # error message if necessary
+                pass
+
+    return args, offset
+
+@pgl.main
+def main():
     defaults = {}
-    for line in git_config.stdout:
-        key, val = line.strip().split('=', 1)
-        key = key.strip()
-        val = val.strip()
-        if key.startswith(DGIT_CONF):
-            subkey = key[DGIT_CONF_LEN:]
-            if subkey == 'githg':
-                config['git-hg'] = val
-            elif subkey == 'hub':
-                if val.lower() in ('off', '0', 'false'):
-                    config['hub'] = None
-                else:
-                    config['hub'] = val
-        elif key.startswith(ALIAS_CONF):
-            cmd_options.append(key[ALIAS_CONF_LEN:])
-        elif key.startswith(DEFAULT_CONF):
-            defaults[key[DEFAULT_CONF_LEN:]] = val.split()
-    git_config.wait()
+
+    # Find out if we're configured to handle git-hg and/or hub
+    if DGIT_CONF + 'githg' in pgl.config and config['git-hg'] is not None:
+        config['git-hg'] = pgl.config[DGIT_CONF + 'githg']
+    if DGIT_CONF + 'hub' in pgl.config:
+        val = pgl.config[DGIT_CONF + 'hub']
+        if val.lower() in ('off', '0', 'false'):
+            config['hub'] = None
+        else:
+            config['hub'] = val
+
+    for k, v in pgl.config.iteritems():
+        if k.startswith(ALIAS_CONF):
+            cmd_options.append(k[ALIAS_CONF_LEN:])
+        elif k.startswith(DEFAULT_CONF):
+            defaults[k[DEFAULT_CONF_LEN:]] = v.split()
 
     # Load the list of built-in git commands, add them to our list of all
     # available commands (built-in and aliases), and finally sort the list
-    cmd_options += load_git_commands()
+    load_git_commands()
     cmd_options.sort(key=lambda x: x.lower())
     config['cmds'] = dict.fromkeys(cmd_options, [])
 
@@ -119,16 +197,37 @@ if __name__ == '__main__':
     # other services. Load the defaults if necessary
     if sys.argv[1] != '--nodefaults':
         config['cmds'].update(defaults)
-        gitargs = sys.argv[1:]
+        args = sys.argv[1:]
     else:
-        gitargs = sys.argv[2:]
-
-    # Find out where git-hg and hub are, if necessary
-    locate_externals(config)
+        args = sys.argv[2:]
 
     # Figure out which git command we're running
-    cmd, dargs = get_git_command(config['cmds'])
+    cmd, cmdpos = get_git_command(args)
+    if cmd is None:
+        pgl.die('Can not figure out what git command to run!')
 
-    # TODO
+    # Find out where git-hg and hub are, if necessary
+    locate_externals()
 
-    sys.exit(0)
+    if config['git-hg']:
+        # Offset will adjust our mangling of the arg list below for the addition
+        # of "hg" into the list, if necessary
+        args, offset = handle_git_hg(cmd, cmdpos, args)
+
+    # Now update our argument list with any defaults we may have
+    argdefaults = defaults.get(cmd, None)
+    if argdefaults:
+        # Always put the argument defaults in just after the command
+        args = args[:cmdpos + 1 + offset] + argdefaults + \
+            args[cmdpos + 1 + offset:]
+
+    # Figure out which binary we're to execute next, and execute it
+    if config['hub']:
+        exe = config['hub']
+    else:
+        exe = 'git'
+    args = [exe] + args
+    os.execvp(exe, args)
+
+    # Crap...
+    pgl.die('Failed to execvp %s!' % (exe,))
