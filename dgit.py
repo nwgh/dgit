@@ -225,7 +225,7 @@ def main():
         args, offset = handle_git_hg(cmd, cmdpos, args)
 
     # Now update our argument list with any defaults we may have
-    argdefaults = defaults.get(cmd, None)
+    argdefaults = config['cmds'].get(cmd, None)
     if argdefaults:
         # Always put the argument defaults in just after the command
         args = args[:cmdpos + 1 + offset] + argdefaults + \
