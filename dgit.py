@@ -106,10 +106,19 @@ def load_git_commands():
 def get_git_command(args):
     """Figure out which git command we've been told to run
     """
+    options = []
     for i, a in enumerate(args):
+        if a.startswith('-'):
+            continue
         if a in config['cmds']:
             return a, i
-    return None, None
+        options.extend([(c, i) for c in config['cmds'] if c.startswith(a)])
+
+    if len(options) == 1:
+        return options[0]
+    elif len(options) > 0:
+        pgl.die('Ambiguous command!')
+    pgl.die('Can not figure out what git command to run!')
 
 def handle_git_hg(cmd, pos, args):
     """Return a modified argument list if we're doing an operation on a git-hg
@@ -203,8 +212,9 @@ def main():
 
     # Figure out which git command we're running
     cmd, cmdpos = get_git_command(args)
-    if cmd is None:
-        pgl.die('Can not figure out what git command to run!')
+
+    # Make sure git gets the full command name
+    args[cmdpos] = cmd
 
     # Find out where git-hg and hub are, if necessary
     locate_externals()
