@@ -65,7 +65,7 @@ def locate_externals():
     """
     # None means we don't WANT to find the external program in question, so
     # we'll pretend we already found it so we don't ACTUALLY find it
-    ghg_found = True if config['git-hg'] if None else bool(config['git-hg'])
+    ghg_found = True if config['git-hg'] is None else bool(config['git-hg'])
     hub_found = True if config['hub'] is None else bool(config['hub'])
 
     if 'hg' in config['cmds'] and not ghg_found:
