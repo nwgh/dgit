@@ -120,6 +120,15 @@ def get_git_command(args):
         pgl.die('Ambiguous command!')
     pgl.die('Can not figure out what git command to run!')
 
+def check_git_hg_push(args):
+    """Raise an exception if we're doing push in a git-hg repo to something that
+    is NOT our hg remote
+    """
+    remotes = set([k.split('.')[1] for k in pgl.config if k.startswith('remote.')])
+    for a in args:
+        if a in remotes and a != 'hg':
+            raise Exception, 'Prevent us from doing something stupid'
+
 def handle_git_hg(cmd, pos, args):
     """Return a modified argument list if we're doing an operation on a git-hg
     repo. For example, cloning an hg repo using the special URL syntax
@@ -157,9 +166,8 @@ def handle_git_hg(cmd, pos, args):
                 if cmd in ('fetch', 'pull') and len(args) != 1:
                     # Someone's fetching or pulling from NOT hg
                     raise Exception, 'This just breaks us out before we do bad'
-                if cmd == 'push' and len(args) > 3:
-                    # Someone's doing some other crazy git push
-                    raise Exception, 'This just breaks us out before we do bad'
+                if cmd == 'push':
+                    check_git_hg_push(args)
 
                 # If we get here, we're reasonably confident we're operating on
                 # the actual HG remote instead of some random other git remote,
