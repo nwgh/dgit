@@ -9,6 +9,8 @@ import pgl
 
 DGIT_CONF = 'dgit.'
 DGIT_CONF_LEN = len(DGIT_CONF)
+DGITEXT_CONF = 'dgitext.'
+DGITEXT_CONF_LEN = len(DGITEXT_CONF)
 ALIAS_CONF = 'alias.'
 ALIAS_CONF_LEN = len(ALIAS_CONF)
 DEFAULT_CONF = 'defaults.'
@@ -201,6 +203,8 @@ def main():
     for k, v in pgl.config.iteritems():
         if k.startswith(ALIAS_CONF):
             cmd_options.append(k[ALIAS_CONF_LEN:])
+        elif k.startswith(DGITEXT_CONF):
+            cmd_options.append(k[DGITEXT_CONF_LEN:])
         elif k.startswith(DEFAULT_CONF):
             defaults[k[DEFAULT_CONF_LEN:]] = v.split()
 
