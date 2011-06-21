@@ -118,9 +118,9 @@ def get_git_command(args):
 
     if len(options) == 1:
         return options[0]
-    elif len(options) > 0:
-        pgl.die('Ambiguous command!')
-    pgl.die('Can not figure out what git command to run!')
+
+    # We'll rely on git to blow up for us
+    return None, None
 
 def check_git_hg_push(args):
     """Raise an exception if we're doing push in a git-hg repo to something that
@@ -225,23 +225,24 @@ def main():
     # Figure out which git command we're running
     cmd, cmdpos = get_git_command(args)
 
-    # Make sure git gets the full command name
-    args[cmdpos] = cmd
+    if cmd is not None:
+        # Make sure git gets the full command name
+        args[cmdpos] = cmd
 
-    # Find out where git-hg and hub are, if necessary
-    locate_externals()
+        # Find out where git-hg and hub are, if necessary
+        locate_externals()
 
-    if config['git-hg']:
-        # Offset will adjust our mangling of the arg list below for the addition
-        # of "hg" into the list, if necessary
-        args, offset = handle_git_hg(cmd, cmdpos, args)
+        if config['git-hg']:
+            # Offset will adjust our mangling of the arg list below for the
+            # addition of "hg" into the list, if necessary
+            args, offset = handle_git_hg(cmd, cmdpos, args)
 
-    # Now update our argument list with any defaults we may have
-    argdefaults = config['cmds'].get(cmd, None)
-    if argdefaults:
-        # Always put the argument defaults in just after the command
-        args = args[:cmdpos + 1 + offset] + argdefaults + \
-            args[cmdpos + 1 + offset:]
+        # Now update our argument list with any defaults we may have
+        argdefaults = config['cmds'].get(cmd, None)
+        if argdefaults:
+            # Always put the argument defaults in just after the command
+            args = args[:cmdpos + 1 + offset] + argdefaults + \
+                args[cmdpos + 1 + offset:]
 
     # Figure out which binary we're to execute next, and execute it
     if config['hub']:
