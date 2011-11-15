@@ -190,6 +190,10 @@ def handle_git_hg(cmd, pos, args):
 def main():
     defaults = {}
 
+    # Make sure we don't blow up if we're called bare
+    if len(sys.argv) == 1:
+        os.execvp('git', ['git'])
+
     # Find out if we're configured to handle git-hg and/or hub
     if DGIT_CONF + 'githg' in pgl.config and config['git-hg'] is not None:
         config['git-hg'] = pgl.config[DGIT_CONF + 'githg']
