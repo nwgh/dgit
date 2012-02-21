@@ -236,6 +236,7 @@ def main():
         # Find out where git-hg and hub are, if necessary
         locate_externals()
 
+        offset = 0
         if config['git-hg']:
             # Offset will adjust our mangling of the arg list below for the
             # addition of "hg" into the list, if necessary
