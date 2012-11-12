@@ -5,7 +5,15 @@ import stat
 import subprocess
 import sys
 
-import pgl
+try:
+    import pgl
+except ImportError:
+    if __name__ == '__main__':
+        # Try to bail out by running git directly if we're being run as git
+        os.execvp('git', sys.argv)
+    else:
+        # Not being run as git, tell the user what's wrong
+        raise
 
 DGIT_CONF = 'dgit.'
 DGIT_CONF_LEN = len(DGIT_CONF)
