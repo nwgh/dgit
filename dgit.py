@@ -25,14 +25,15 @@ DEFAULT_CONF = 'defaults.'
 DEFAULT_CONF_LEN = len(DEFAULT_CONF)
 
 cmd_options = []
-config = {'git-hg':False, 'hub':False, 'cmds':None}
+config = {'git-hg': False, 'hub': False, 'cmds': None}
 
 try:
     import ghg
 except ImportError:
-    # If we can't import ghg, it doesn't matter if git-hg is otherwise installed,
-    # we can't do any git-hg work
+    # If we can't import ghg, it doesn't matter if git-hg is otherwise
+    # installed, we can't do any git-hg work
     config['git-hg'] = None
+
 
 def is_exe(fname):
     """Determine if a file exists, and, if so, if it's executable by our user
@@ -69,6 +70,7 @@ def is_exe(fname):
 
     return False
 
+
 def locate_externals():
     """Find the location of git-hg and hub, if we haven't been explicitly told
     where they are
@@ -89,17 +91,26 @@ def locate_externals():
     path = os.getenv('PATH')
     path = path.split(os.pathsep)
     for d in path:
-        ghg = os.path.join(d, 'git-hg')
-        hub = os.path.join(d, 'hub')
-        if not ghg_found and is_exe(ghg):
-            config['git-hg'] = ghg
+        ghg_exe = os.path.join(d, 'git-hg')
+        hub_exe = os.path.join(d, 'hub')
+        if not ghg_found and is_exe(ghg_exe):
+            config['git-hg'] = ghg_exe
             ghg_found = True
-        if not hub_found and is_exe(hub):
-            config['hub'] = hub
+        if not hub_found and is_exe(hub_exe):
+            config['hub'] = hub_exe
             hub_found = True
         if ghg_found and hub_found:
             # Finally!
             return
+
+
+def is_executable_git_command(f):
+    """Return true if this git command is executable like we expect, otherwise
+    return false
+    """
+    return os.path.isfile(f) and \
+        (os.stat(f) & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
+
 
 def load_git_commands():
     """Make a list of git's built-in commands
@@ -109,9 +120,9 @@ def load_git_commands():
             # Skip these, since they're just additions to other git commands
             continue
         full = os.path.join(pgl.config['GIT_LIBEXEC'], f)
-        if f.startswith('git-') and os.path.isfile(full) and \
-            (os.stat(full).st_mode & (stat.S_IXUSR|stat.S_IXGRP|stat.S_IXOTH)):
+        if f.startswith('git-') and is_executable_git_command(full):
             cmd_options.append(f[4:])
+
 
 def get_git_command(args):
     """Figure out which git command we've been told to run
@@ -130,14 +141,17 @@ def get_git_command(args):
     # We'll rely on git to blow up for us
     return None, None
 
+
 def check_git_hg_push(args):
-    """Raise an exception if we're doing push in a git-hg repo to something that
-    is NOT our hg remote
+    """Raise an exception if we're doing push in a git-hg repo to something
+    that is NOT our hg remote
     """
-    remotes = set([k.split('.')[1] for k in pgl.config if k.startswith('remote.')])
+    remotes = set([k.split('.')[1] for k in pgl.config
+                   if k.startswith('remote.')])
     for a in args:
         if a in remotes and a != 'hg':
-            raise Exception, 'Prevent us from doing something stupid'
+            raise Exception('Prevent us from doing something stupid')
+
 
 def handle_git_hg(cmd, pos, args):
     """Return a modified argument list if we're doing an operation on a git-hg
@@ -175,7 +189,7 @@ def handle_git_hg(cmd, pos, args):
                 ghg.ensure_is_ghg()
                 if cmd in ('fetch', 'pull') and len(args) != 1:
                     # Someone's fetching or pulling from NOT hg
-                    raise Exception, 'This just breaks us out before we do bad'
+                    raise Exception('This just breaks us out before we do bad')
                 if cmd == 'push':
                     check_git_hg_push(args)
 
@@ -193,6 +207,7 @@ def handle_git_hg(cmd, pos, args):
                 pass
 
     return args, offset
+
 
 @pgl.main
 def main():
