@@ -5,15 +5,6 @@ import stat
 import subprocess
 import sys
 
-try:
-    import pgl
-except ImportError:
-    if __name__ == '__main__':
-        # Try to bail out by running git directly if we're being run as git
-        os.execvp('git', sys.argv)
-    else:
-        # Not being run as git, tell the user what's wrong
-        raise
 
 DGIT_CONF = 'dgit.'
 DGIT_CONF_LEN = len(DGIT_CONF)
@@ -24,8 +15,13 @@ ALIAS_CONF_LEN = len(ALIAS_CONF)
 DEFAULT_CONF = 'defaults.'
 DEFAULT_CONF_LEN = len(DEFAULT_CONF)
 
+
 cmd_options = []
 config = {'hub': False, 'cmds': None}
+
+
+git_libexec = None
+git_config = {}
 
 
 def is_exe(fname):
@@ -93,17 +89,17 @@ def is_executable_git_command(f):
     return false
     """
     return os.path.isfile(f) and \
-        (os.stat(f) & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
+        (os.stat(f).st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
 
 
 def load_git_commands():
     """Make a list of git's built-in commands
     """
-    for f in os.listdir(pgl.config['GIT_LIBEXEC']):
+    for f in os.listdir(git_libexec):
         if '--' in f:
             # Skip these, since they're just additions to other git commands
             continue
-        full = os.path.join(pgl.config['GIT_LIBEXEC'], f)
+        full = os.path.join(git_libexec, f)
         if f.startswith('git-') and is_executable_git_command(full):
             cmd_options.append(f[4:])
 
@@ -131,26 +127,50 @@ def prepend_to_path(path, item):
     """
     if not path:
         return item
-    return os.pathsep.join(item, path)
+    return os.pathsep.join([item, path])
 
 
-@pgl.main
 def main():
+    global git_libexec
+    global git_config
+
     defaults = {}
 
     # Make sure we don't blow up if we're called bare
     if len(sys.argv) == 1:
         os.execvp('git', ['git'])
 
+    # Get all the config we need from git
+    gitexec = subprocess.Popen(['git', '--exec-path'], stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    gitexec.wait()
+    git_libexec = gitexec.stdout.readlines()[0].strip()
+
+    gitvar = subprocess.Popen(['git', 'var', '-l'], stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE)
+    gitvar.wait()
+    for line in gitvar.stdout:
+        k, v = line.strip().split('=', 1)
+        if v == 'true':
+            v = True
+        elif v == 'false':
+            v = False
+        else:
+            try:
+                v = int(v)
+            except ValueError:
+                pass
+        git_config[k] = v
+
     # Find out if we're configured to handle hub
-    if DGIT_CONF + 'hub' in pgl.config:
-        val = pgl.config[DGIT_CONF + 'hub']
+    if DGIT_CONF + 'hub' in git_config:
+        val = git_config[DGIT_CONF + 'hub']
         if val.lower() in ('off', '0', 'false'):
             config['hub'] = None
         else:
             config['hub'] = val
 
-    for k, v in pgl.config.iteritems():
+    for k, v in git_config.iteritems():
         if k.startswith(ALIAS_CONF):
             cmd_options.append(k[ALIAS_CONF_LEN:])
         elif k.startswith(DGITEXT_CONF):
@@ -189,12 +209,12 @@ def main():
             args = args[:cmdpos + 1] + argdefaults + \
                 args[cmdpos + 1:]
 
-    git_remote_hg = config.get(DGIT_CONF + 'git-remote-hg', None)
+    git_remote_hg = git_config.get(DGIT_CONF + 'git-remote-hg', None)
     if git_remote_hg:
         oldpath = os.environ.get('PATH', None)
         os.environ['PATH'] = prepend_to_path(oldpath, git_remote_hg)
 
-    pypath = config.get(DGIT_CONF + 'pythonpath', None)
+    pypath = git_config.get(DGIT_CONF + 'pythonpath', None)
     if pypath:
         oldpypath = os.environ.get('PYTHONPATH', None)
         os.environ['PYTHONPATH'] = prepend_to_path(oldpypath, pypath)
@@ -208,4 +228,8 @@ def main():
     os.execvp(exe, args)
 
     # Crap...
-    pgl.die('Failed to execvp %s!' % (exe,))
+    sys.stderr.write('Failed to execvp %s!\n' % (exe,))
+    sys.exit(1)
+
+if __name__ == '__main__':
+    main()

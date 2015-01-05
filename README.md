@@ -29,19 +29,9 @@ If you don't feel like "overwriting" your real `git` with `dgit` by using an
 alias, `dgit` will work just fine withouth being aliased. The rest of this
 README assumes you're using the alias, though.
 
-After that, just use `git` the way you normally would. If you have `git-hg`
-(<https://github.com/todesschaf/git-hg>) installed, as well, you can do things
-like:
+After that, just use `git` the way you normally would.
 
-    git clone hg+http://hg.example.com/examplerepo
-
-and:
-
-    git fetch # (in a git-hg repo)
-
-and `dgit` will Do The Right Thing.
-
-If you use `hub` (<https://github.com/defunkt/hub>) `dgit` can also be
+If you use `hub` (<https://github.com/defunkt/hub>) `dgit` can be
 configured to use that.
 
 HOW DO I CONFIGURE DGIT?
