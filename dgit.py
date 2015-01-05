@@ -25,14 +25,7 @@ DEFAULT_CONF = 'defaults.'
 DEFAULT_CONF_LEN = len(DEFAULT_CONF)
 
 cmd_options = []
-config = {'git-hg': False, 'hub': False, 'cmds': None}
-
-try:
-    import ghg
-except ImportError:
-    # If we can't import ghg, it doesn't matter if git-hg is otherwise
-    # installed, we can't do any git-hg work
-    config['git-hg'] = None
+config = {'hub': False, 'cmds': None}
 
 
 def is_exe(fname):
@@ -72,34 +65,25 @@ def is_exe(fname):
 
 
 def locate_externals():
-    """Find the location of git-hg and hub, if we haven't been explicitly told
-    where they are
+    """Find the location of hub, if we haven't been explicitly told where they
+    are
     """
     # None means we don't WANT to find the external program in question, so
     # we'll pretend we already found it so we don't ACTUALLY find it
-    ghg_found = True if config['git-hg'] is None else bool(config['git-hg'])
     hub_found = True if config['hub'] is None else bool(config['hub'])
 
-    if 'hg' in config['cmds'] and not ghg_found:
-        config['git-hg'] = True
-        ghg_found = True
-
-    if ghg_found and hub_found:
+    if hub_found:
         # Hey, look! We're done without even really starting!
         return
 
     path = os.getenv('PATH')
     path = path.split(os.pathsep)
     for d in path:
-        ghg_exe = os.path.join(d, 'git-hg')
         hub_exe = os.path.join(d, 'hub')
-        if not ghg_found and is_exe(ghg_exe):
-            config['git-hg'] = ghg_exe
-            ghg_found = True
         if not hub_found and is_exe(hub_exe):
             config['hub'] = hub_exe
             hub_found = True
-        if ghg_found and hub_found:
+        if hub_found:
             # Finally!
             return
 
@@ -142,71 +126,12 @@ def get_git_command(args):
     return None, None
 
 
-def check_git_hg_push(args):
-    """Raise an exception if we're doing push in a git-hg repo to something
-    that is NOT our hg remote
+def prepend_to_path(path, item):
+    """Prepend <item> to the path variable <path>. Returns a new string
     """
-    remotes = set([k.split('.')[1] for k in pgl.config
-                   if k.startswith('remote.')])
-    for a in args:
-        if a in remotes and a != 'hg':
-            raise Exception('Prevent us from doing something stupid')
-
-
-def handle_git_hg(cmd, pos, args):
-    """Return a modified argument list if we're doing an operation on a git-hg
-    repo. For example, cloning an hg repo using the special URL syntax
-      git clone hg+http://hg.example.com/repo
-    Which passes us the args list
-      ['clone', 'hg+http://hg.example.com/repo']
-    Would return the new list
-      ['hg', 'clone', 'http://hg.example.com/repo']
-
-    Similarly, running a fetch in an hg repo (that does not fetch from a non-hg
-    remote) like
-      git fetch
-    Which passes us the args list
-      ['fetch']
-    Would return the new list
-      ['hg', 'fetch']
-    """
-    offset = 0
-    if cmd in ('clone', 'fetch', 'pull', 'push'):
-        if cmd == 'clone':
-            urlpos = None
-            for i, a in enumerate(args):
-                if a.startswith('hg+'):
-                    urlpos = i
-            if urlpos is not None:
-                # This means we've found an hg-special URL, so we need to
-                # massage this command into a git-hg command
-                args[urlpos] = args[urlpos][3:]
-                args.insert(pos, 'hg')
-                offset = 1
-        else:
-            try:
-                ghg.include_hg_setup()
-                ghg.ensure_is_ghg()
-                if cmd in ('fetch', 'pull') and len(args) != 1:
-                    # Someone's fetching or pulling from NOT hg
-                    raise Exception('This just breaks us out before we do bad')
-                if cmd == 'push':
-                    check_git_hg_push(args)
-
-                # If we get here, we're reasonably confident we're operating on
-                # the actual HG remote instead of some random other git remote,
-                # so make go on that!
-                args.insert(pos, 'hg')
-                offset = 1
-            except:
-                # This isn't a Git-HG repo, we're communicating with a non-hg
-                # remote, or there was some error figuring out the git-hg setup
-                # for the current dir, so we just continue on with our original
-                # command and args, trusting the REAL git to give us a proper
-                # error message if necessary
-                pass
-
-    return args, offset
+    if not path:
+        return item
+    return os.pathsep.join(item, path)
 
 
 @pgl.main
@@ -217,9 +142,7 @@ def main():
     if len(sys.argv) == 1:
         os.execvp('git', ['git'])
 
-    # Find out if we're configured to handle git-hg and/or hub
-    if DGIT_CONF + 'githg' in pgl.config and config['git-hg'] is not None:
-        config['git-hg'] = pgl.config[DGIT_CONF + 'githg']
+    # Find out if we're configured to handle hub
     if DGIT_CONF + 'hub' in pgl.config:
         val = pgl.config[DGIT_CONF + 'hub']
         if val.lower() in ('off', '0', 'false'):
@@ -256,21 +179,25 @@ def main():
         # Make sure git gets the full command name
         args[cmdpos] = cmd
 
-        # Find out where git-hg and hub are, if necessary
+        # Find out where hub is, if necessary
         locate_externals()
-
-        offset = 0
-        if config['git-hg']:
-            # Offset will adjust our mangling of the arg list below for the
-            # addition of "hg" into the list, if necessary
-            args, offset = handle_git_hg(cmd, cmdpos, args)
 
         # Now update our argument list with any defaults we may have
         argdefaults = config['cmds'].get(cmd, None)
         if argdefaults:
             # Always put the argument defaults in just after the command
-            args = args[:cmdpos + 1 + offset] + argdefaults + \
-                args[cmdpos + 1 + offset:]
+            args = args[:cmdpos + 1] + argdefaults + \
+                args[cmdpos + 1:]
+
+    git_remote_hg = config.get(DGIT_CONF + 'git-remote-hg', None)
+    if git_remote_hg:
+        oldpath = os.environ.get('PATH', None)
+        os.environ['PATH'] = prepend_to_path(oldpath, git_remote_hg)
+
+    pypath = config.get(DGIT_CONF + 'pythonpath', None)
+    if pypath:
+        oldpypath = os.environ.get('PYTHONPATH', None)
+        os.environ['PYTHONPATH'] = prepend_to_path(oldpypath, pypath)
 
     # Figure out which binary we're to execute next, and execute it
     if config['hub']:
